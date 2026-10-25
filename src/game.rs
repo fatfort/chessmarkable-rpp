@@ -1,0 +1,526 @@
+pub use crate::{Player, Square};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use shakmaty::{
+    fen::Fen, san::SanPlus, CastlingMode, Chess, Color as ShakmColor, File as ShakmFile,
+    Move as ShakmMove, MoveList, Piece as ShakmPiece, Position, Rank as ShakmRank,
+    Role, Square as ShakmSquare,
+};
+
+// Re-export shakmaty types used by other modules
+pub use shakmaty::{
+    File as ChessFile, Piece as ChessPiece, Rank as ChessRank, Role as ChessRole,
+    Square as ChessSquare,
+};
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ChessOutcome {
+    Checkmate { winner: Player },
+    Stalemate,
+    Aborted { who: Option<Player> },
+}
+
+/// Wrapper around shakmaty's Chess position.
+/// Maintains a history stack for undo support.
+pub struct ChessGame {
+    position: Chess,
+    history: Vec<Chess>,
+    san_moves: Vec<String>,
+    starting_fen: Option<String>,
+    board_moves_played_offset: u16,
+    moves_played: u16,
+    outcome: Option<ChessOutcome>,
+}
+
+impl Default for ChessGame {
+    fn default() -> Self {
+        Self {
+            position: Chess::default(),
+            history: Vec::new(),
+            san_moves: Vec::new(),
+            starting_fen: None,
+            board_moves_played_offset: 0,
+            moves_played: 0,
+            outcome: None,
+        }
+    }
+}
+
+impl ChessGame {
+    pub fn from_fen(fen: &str) -> Result<ChessGame> {
+        let parsed: Fen = fen.parse().map_err(|e| anyhow!(
+            "Failed to parse FEN string: {:?}", e
+        ))?;
+        let position: Chess = parsed.into_position(CastlingMode::Standard).map_err(|e| anyhow!(
+            "Failed to create game board from FEN. Reason: {:?}", e
+        ))?;
+        let initial_moves = 0u16;
+        Ok(Self {
+            position,
+            history: Vec::new(),
+            san_moves: Vec::new(),
+            starting_fen: Some(fen.to_string()),
+            board_moves_played_offset: initial_moves,
+            moves_played: initial_moves,
+            outcome: None,
+        })
+    }
+
+    /// Create a game from a PGN string, replaying all moves to rebuild history.
+    pub fn from_pgn(pgn: &str) -> Result<ChessGame> {
+        // Parse PGN tags
+        let mut starting_fen: Option<String> = None;
+
+        // Extract tags and movetext
+        let mut tag_end = 0;
+        let pgn_bytes = pgn.as_bytes();
+        let mut i = 0;
+        while i < pgn_bytes.len() {
+            // Skip whitespace
+            while i < pgn_bytes.len() && pgn_bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            if i < pgn_bytes.len() && pgn_bytes[i] == b'[' {
+                // Parse tag
+                let tag_start = i;
+                while i < pgn_bytes.len() && pgn_bytes[i] != b']' {
+                    i += 1;
+                }
+                if i < pgn_bytes.len() {
+                    i += 1; // skip ']'
+                }
+                tag_end = i;
+                let tag_str = &pgn[tag_start..tag_end];
+                // Check for FEN tag
+                if let Some(fen_val) = tag_str.strip_prefix("[FEN \"") {
+                    if let Some(fen_val) = fen_val.strip_suffix("\"]") {
+                        starting_fen = Some(fen_val.to_string());
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        let mut movetext = pgn[tag_end..].trim().to_string();
+
+        // Remove result markers
+        for result in &["1-0", "0-1", "1/2-1/2", "*"] {
+            movetext = movetext.replace(result, "");
+        }
+        let movetext = movetext.trim();
+
+        // Create starting position
+        let mut game = if let Some(ref fen) = starting_fen {
+            ChessGame::from_fen(fen)?
+        } else {
+            ChessGame::default()
+        };
+
+        if movetext.is_empty() {
+            return Ok(game);
+        }
+
+        // Parse and replay moves
+        // Remove move numbers (e.g., "1.", "12.", "1...")
+        let re = regex::Regex::new(r"\d+\.+\s*").unwrap();
+        let clean = re.replace_all(movetext, " ");
+        let tokens: Vec<&str> = clean.split_whitespace()
+            .filter(|t| !t.is_empty())
+            .collect();
+
+        for token in tokens {
+            // Skip comments, NAGs, etc.
+            if token.starts_with('{') || token.starts_with('(') || token.starts_with('$') {
+                continue;
+            }
+
+            let san: shakmaty::san::San = token.parse().map_err(|e| anyhow!(
+                "Failed to parse SAN '{}': {:?}", token, e
+            ))?;
+            let the_move = san.to_move(&game.position).map_err(|e| anyhow!(
+                "Illegal SAN '{}': {:?}", token, e
+            ))?;
+
+            // Compute SAN with check/checkmate suffix before playing
+            let san_plus = SanPlus::from_move(game.position.clone(), the_move.clone());
+            game.san_moves.push(san_plus.to_string());
+
+            game.history.push(game.position.clone());
+            game.position.play_unchecked(the_move);
+            game.moves_played += 1;
+        }
+
+        game.update_game_outcome();
+        Ok(game)
+    }
+
+    /// Generate PGN string for the current game.
+    pub fn to_pgn(&self) -> String {
+        let mut pgn = String::new();
+
+        // Tags
+        pgn.push_str("[Event \"chessMarkable Game\"]\n");
+        pgn.push_str("[Site \"reMarkable Paper Pro\"]\n");
+        let date = "????.??.??";
+        pgn.push_str(&format!("[Date \"{}\"]\n", date));
+        pgn.push_str("[White \"Player\"]\n");
+        pgn.push_str("[Black \"Player\"]\n");
+
+        let result = match self.outcome {
+            Some(ChessOutcome::Checkmate { winner: Player::White }) => "1-0",
+            Some(ChessOutcome::Checkmate { winner: Player::Black }) => "0-1",
+            Some(ChessOutcome::Stalemate) => "1/2-1/2",
+            Some(ChessOutcome::Aborted { .. }) => "*",
+            None => "*",
+        };
+        pgn.push_str(&format!("[Result \"{}\"]\n", result));
+
+        if let Some(ref fen) = self.starting_fen {
+            pgn.push_str(&format!("[FEN \"{}\"]\n", fen));
+            pgn.push_str("[SetUp \"1\"]\n");
+        }
+
+        pgn.push('\n');
+
+        // Movetext
+        let start_color = if let Some(ref fen) = self.starting_fen {
+            if fen.contains(" b ") {
+                ShakmColor::Black
+            } else {
+                ShakmColor::White
+            }
+        } else {
+            ShakmColor::White
+        };
+
+        let start_fullmove = if let Some(ref fen) = self.starting_fen {
+            // Parse fullmove number from FEN (last field)
+            fen.split_whitespace().last()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1)
+        } else {
+            1
+        };
+
+        let mut fullmove = start_fullmove;
+        let mut is_white_turn = start_color == ShakmColor::White;
+        let mut first_move = true;
+
+        for san in &self.san_moves {
+            if is_white_turn {
+                if !first_move {
+                    pgn.push(' ');
+                }
+                pgn.push_str(&format!("{}. {}", fullmove, san));
+            } else {
+                if first_move {
+                    // Game started on black's turn
+                    pgn.push_str(&format!("{}... {}", fullmove, san));
+                } else {
+                    pgn.push_str(&format!(" {}", san));
+                }
+                fullmove += 1;
+            }
+            is_white_turn = !is_white_turn;
+            first_move = false;
+        }
+
+        if !self.san_moves.is_empty() {
+            pgn.push(' ');
+        }
+        pgn.push_str(result);
+
+        pgn
+    }
+
+    pub fn position(&self) -> &Chess {
+        &self.position
+    }
+
+    pub fn fen(&self) -> String {
+        let fen = Fen::from_position(&self.position, shakmaty::EnPassantMode::Legal);
+        fen.to_string()
+    }
+
+    pub fn turn(&self) -> Player {
+        self.position.turn().into()
+    }
+
+    pub fn outcome(&self) -> Option<ChessOutcome> {
+        self.outcome
+    }
+
+    pub fn total_moves(&self) -> u16 {
+        self.moves_played
+    }
+
+    pub fn total_undoable_moves(&self) -> u16 {
+        self.history.len() as u16
+    }
+
+    pub fn possible_moves(&self) -> MoveList {
+        self.position.legal_moves()
+    }
+
+    pub fn player_left(&mut self, player: Player) {
+        if self.outcome.is_none() {
+            self.outcome = Some(ChessOutcome::Aborted { who: Some(player) });
+        }
+    }
+
+    pub fn undo(&mut self, count: u16) -> Result<()> {
+        if count as usize > self.history.len() {
+            return Err(anyhow!(
+                "Can't undo {} moves. Only {} moves available to undo.",
+                count, self.history.len()
+            ));
+        }
+
+        for _ in 0..count {
+            if let Some(prev) = self.history.pop() {
+                self.position = prev;
+                self.moves_played -= 1;
+                self.san_moves.pop();
+            }
+        }
+        self.update_game_outcome();
+        Ok(())
+    }
+
+    fn piece_on_square(&self, player: Player, square: Square) -> bool {
+        let color: ShakmColor = player.into();
+        let board = self.position.board();
+        let occupied = board.by_color(color);
+        occupied.contains(square.inner())
+    }
+
+    fn update_game_outcome(&mut self) {
+        if self.position.is_checkmate() {
+            self.outcome = Some(ChessOutcome::Checkmate {
+                winner: self.turn().other_player(),
+            });
+        } else if self.position.is_stalemate() {
+            self.outcome = Some(ChessOutcome::Stalemate);
+        } else if let Some(outcome) = self.outcome {
+            match outcome {
+                ChessOutcome::Aborted { .. } => {} // Abort is irreversible
+                _ => self.outcome = None,
+            };
+        }
+    }
+
+    pub fn move_piece_by_type(
+        &mut self,
+        piece: ShakmPiece,
+        destination: Square,
+        src_col: Option<ShakmFile>,
+        src_row: Option<ShakmRank>,
+    ) -> Result<(Square, Square)> {
+        ensure!(
+            self.outcome.is_none(),
+            "Can't do move since the game has already ended."
+        );
+
+        let legal_moves = self.position.legal_moves();
+        let mut candidate_moves: Vec<&ShakmMove> = Vec::new();
+
+        for legal_move in legal_moves.iter() {
+            let (src, dst, role) = match legal_move {
+                ShakmMove::Normal { from, to, role, .. } => (*from, *to, *role),
+                ShakmMove::Castle { king, rook } => {
+                    // For castling, the king's destination depends on side
+                    let king_dst = if rook.file() > king.file() {
+                        // Kingside
+                        ShakmSquare::from_coords(ShakmFile::G, king.rank())
+                    } else {
+                        // Queenside
+                        ShakmSquare::from_coords(ShakmFile::C, king.rank())
+                    };
+                    (*king, king_dst, Role::King)
+                }
+                ShakmMove::EnPassant { from, to } => (*from, *to, Role::Pawn),
+                ShakmMove::Put { .. } => continue,
+            };
+
+            // Check this move involves the right piece type at a source square
+            let move_piece = ShakmPiece { color: self.position.turn(), role };
+            if move_piece == piece && dst == destination.inner() {
+                candidate_moves.push(legal_move);
+            }
+        }
+
+        if candidate_moves.is_empty() {
+            return Err(anyhow!("Move not found as possibility"));
+        }
+
+        let mut selected_move: Option<&ShakmMove> = None;
+        if candidate_moves.len() == 1 {
+            selected_move = Some(candidate_moves[0]);
+        }
+
+        if selected_move.is_none() && src_col.is_some() {
+            selected_move = candidate_moves.iter().find(|m| {
+                move_src(m).map(|s| s.file()) == src_col
+            }).copied();
+        }
+        if selected_move.is_none() && src_row.is_some() {
+            selected_move = candidate_moves.iter().find(|m| {
+                move_src(m).map(|s| s.rank()) == src_row
+            }).copied();
+        }
+
+        if selected_move.is_none() {
+            return Err(anyhow!("Move not found as possibility"));
+        }
+
+        let selected_move = selected_move.unwrap().clone();
+        let src_sq = move_src(&selected_move).unwrap_or(destination.inner());
+
+        let san_plus = SanPlus::from_move(self.position.clone(), selected_move.clone());
+        self.san_moves.push(san_plus.to_string());
+
+        self.history.push(self.position.clone());
+        self.position.play_unchecked(selected_move);
+        self.moves_played += 1;
+
+        self.update_game_outcome();
+        Ok((Square::from(src_sq), destination))
+    }
+
+    /// Check if a move from source to destination is a pawn promotion.
+    pub fn is_promotion_move(&self, source: Square, destination: Square) -> bool {
+        self.position.legal_moves().iter().any(|m| {
+            matches!(m, ShakmMove::Normal { from, to, promotion: Some(_), .. }
+                if *from == source.inner() && *to == destination.inner())
+        })
+    }
+
+    pub fn move_piece(
+        &mut self,
+        source: Square,
+        destination: Square,
+        promotion: Option<shakmaty::Role>,
+    ) -> Result<()> {
+        ensure!(
+            self.piece_on_square(self.turn(), source),
+            "The playing player has no piece on the source square!"
+        );
+        ensure!(source != destination, "Move does not actually move");
+        ensure!(
+            self.outcome.is_none(),
+            "Can't do move since the game has already ended."
+        );
+
+        let legal_moves = self.position.legal_moves();
+        let mut selected_move: Option<ShakmMove> = None;
+
+        for legal_move in legal_moves.iter() {
+            match legal_move {
+                ShakmMove::Normal {
+                    from,
+                    to,
+                    promotion: promo,
+                    ..
+                } => {
+                    if *from == source.inner() && *to == destination.inner() {
+                        if promo.is_some() {
+                            // Promotion move — only match if role matches
+                            if promotion == *promo {
+                                selected_move = Some(legal_move.clone());
+                            }
+                        } else {
+                            selected_move = Some(legal_move.clone());
+                        }
+                    }
+                }
+                ShakmMove::Castle { king, rook } => {
+                    if *king == source.inner() && *rook == destination.inner() {
+                        selected_move = Some(legal_move.clone());
+                    }
+                }
+                ShakmMove::EnPassant { from, to } => {
+                    if *from == source.inner() && *to == destination.inner() {
+                        selected_move = Some(legal_move.clone());
+                    }
+                }
+                ShakmMove::Put { .. } => continue,
+            }
+        }
+
+        // Also try castling by king destination squares (G1/C1/G8/C8)
+        if selected_move.is_none() {
+            for legal_move in legal_moves.iter() {
+                if let ShakmMove::Castle { king, rook } = legal_move {
+                    let king_dst = if rook.file() > king.file() {
+                        ShakmSquare::from_coords(ShakmFile::G, king.rank())
+                    } else {
+                        ShakmSquare::from_coords(ShakmFile::C, king.rank())
+                    };
+                    if *king == source.inner() && king_dst == destination.inner() {
+                        selected_move = Some(legal_move.clone());
+                    }
+                }
+            }
+        }
+
+        if selected_move.is_none() {
+            return Err(anyhow!("Move not found as possibility"));
+        }
+
+        let selected_move = selected_move.unwrap();
+
+        let san_plus = SanPlus::from_move(self.position.clone(), selected_move.clone());
+        self.san_moves.push(san_plus.to_string());
+
+        self.history.push(self.position.clone());
+        self.position.play_unchecked(selected_move);
+        self.moves_played += 1;
+
+        self.update_game_outcome();
+        Ok(())
+    }
+}
+
+/// Extract the source square from a shakmaty Move.
+pub fn move_src(m: &ShakmMove) -> Option<ShakmSquare> {
+    match m {
+        ShakmMove::Normal { from, .. } => Some(*from),
+        ShakmMove::Castle { king, .. } => Some(*king),
+        ShakmMove::EnPassant { from, .. } => Some(*from),
+        ShakmMove::Put { .. } => None,
+    }
+}
+
+/// Extract the destination square from a shakmaty Move.
+pub fn move_dst(m: &ShakmMove) -> ShakmSquare {
+    match m {
+        ShakmMove::Normal { to, .. } => *to,
+        ShakmMove::Castle { king, rook } => {
+            if rook.file() > king.file() {
+                ShakmSquare::from_coords(ShakmFile::G, king.rank())
+            } else {
+                ShakmSquare::from_coords(ShakmFile::C, king.rank())
+            }
+        }
+        ShakmMove::EnPassant { to, .. } => *to,
+        ShakmMove::Put { to, .. } => *to,
+    }
+}
+
+/// Map a shakmaty Piece to a character for display purposes.
+pub fn piece_to_char(piece: ShakmPiece) -> char {
+    let c = match piece.role {
+        Role::Pawn => 'P',
+        Role::Knight => 'N',
+        Role::Bishop => 'B',
+        Role::Rook => 'R',
+        Role::Queen => 'Q',
+        Role::King => 'K',
+    };
+    if piece.color == ShakmColor::Black {
+        c.to_ascii_lowercase()
+    } else {
+        c
+    }
+}

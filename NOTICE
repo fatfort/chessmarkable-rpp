@@ -1,0 +1,213 @@
+chessMarkable RPP — licence and third-party notices
+====================================================
+
+chessMarkable RPP (this repository, and every binary built from it) is free
+software under the GNU General Public License, version 3 or (at your option)
+any later version. The full text is in COPYING. The work as a whole is GPL
+because it statically links shakmaty, which is GPL-3.0-or-later.
+
+  Copyright (C) 2020 Linus K. (original chessMarkable)
+  Copyright (C) 2026 Aayush Bajaj (reMarkable Paper Pro / Move port)
+
+Upstream
+--------
+- chessMarkable by Linus K. (LinusCDE), MIT License.
+  https://github.com/LinusCDE/chessmarkable
+  Its copyright and permission notice is kept verbatim in
+  LICENSE-MIT-chessMarkable and continues to apply to the original code.
+  Not affiliated with or endorsed by LinusCDE. "chessMarkable" is used
+  nominatively to identify the upstream project this port derives from.
+
+Modifications (GPL-3.0 section 5a)
+----------------------------------
+Modified from LinusCDE/chessmarkable by Aayush Bajaj, April–July 2026:
+- Display backend: libremarkable framebuffer -> QTFB shared-memory protocol.
+- Chess engine: pleco (x86-only) -> shakmaty (pure Rust, aarch64).
+- Architecture: armv7 (gnueabihf) -> aarch64 (musl, static).
+- RGB colour board for the Gallery 3 e-ink panel; interactive pawn-promotion UI.
+- Packaged as a standalone rm-appload (AppLoad) application.
+- Paper Pro Move build (--features move): native 954-px-wide layout, scaled
+  buttons and dialogs.
+
+Bundled in this repository
+--------------------------
+- chess_pgn_parser/ — PGN parser by Henri Wiechers, MIT (chess_pgn_parser/LICENSE).
+- serde_string_derive/ — from upstream chessMarkable, MIT (as above).
+- res/NotoSans-Regular.ttf — SIL Open Font License 1.1
+  (res/NOTO-OFL-LICENSE.txt), Copyright The Noto Project Authors.
+- res/*.png chess pieces — derived from a vector set on Pixabay
+  (https://pixabay.com/vectors/chess-pieces-set-symbols-game-26774/),
+  used under the Pixabay Content License (commercial use permitted).
+
+Rust crates (Cargo.lock, licences as declared on crates.io, checked 2026-10-26)
+-------------------------------------------------------------------------------
+Cargo.lock lists every platform's dependencies; not all of them are linked into
+the aarch64-musl reMarkable binary. Apart from shakmaty (GPL-3.0-or-later), every
+declared licence is permissive and GPL-3.0-compatible.
+
+  addr2line 0.24.2                    Apache-2.0 OR MIT
+  adler 1.0.2                         0BSD OR MIT OR Apache-2.0
+  adler2 2.0.1                        0BSD OR MIT OR Apache-2.0
+  aho-corasick 1.1.3                  Unlicense OR MIT
+  allocator-api2 0.2.21               MIT OR Apache-2.0
+  anstream 0.6.20                     MIT OR Apache-2.0
+  anstyle 1.0.11                      MIT OR Apache-2.0
+  anstyle-parse 0.2.7                 MIT OR Apache-2.0
+  anstyle-query 1.1.4                 MIT OR Apache-2.0
+  anstyle-wincon 3.0.10               MIT OR Apache-2.0
+  anyhow 1.0.99                       MIT OR Apache-2.0
+  approx 0.4.0                        Apache-2.0
+  arrayvec 0.7.6                      MIT OR Apache-2.0
+  autocfg 1.1.0                       Apache-2.0 OR MIT
+  backtrace 0.3.75                    MIT OR Apache-2.0
+  bit_field 0.10.3                    Apache-2.0/MIT
+  bitflags 1.3.2                      MIT/Apache-2.0
+  bitflags 2.9.4                      MIT OR Apache-2.0
+  btoi 0.5.0                          MIT OR Apache-2.0
+  bumpalo 3.20.2                      MIT OR Apache-2.0
+  bytemuck 1.23.2                     Zlib OR Apache-2.0 OR MIT
+  byteorder 1.4.3                     Unlicense OR MIT
+  cfg-if 1.0.0                        MIT/Apache-2.0
+  cgmath 0.18.0                       Apache-2.0
+  clap 4.5.47                         MIT OR Apache-2.0
+  clap_builder 4.5.47                 MIT OR Apache-2.0
+  clap_derive 4.5.47                  MIT OR Apache-2.0
+  clap_lex 0.7.5                      MIT OR Apache-2.0
+  color_quant 1.1.0                   MIT
+  colorchoice 1.0.4                   MIT OR Apache-2.0
+  crc32fast 1.5.0                     MIT OR Apache-2.0
+  crossbeam-channel 0.5.4             MIT OR Apache-2.0
+  crossbeam-deque 0.8.1               MIT OR Apache-2.0
+  crossbeam-epoch 0.9.8               MIT OR Apache-2.0
+  crossbeam-utils 0.8.8               MIT OR Apache-2.0
+  crunchy 0.2.4                       MIT
+  downcast-rs 2.0.2                   MIT OR Apache-2.0
+  either 1.6.1                        MIT/Apache-2.0
+  enum_primitive 0.1.1                MIT
+  env_filter 0.1.3                    MIT OR Apache-2.0
+  env_logger 0.11.8                   MIT OR Apache-2.0
+  equivalent 1.0.2                    Apache-2.0 OR MIT
+  exr 1.5.3                           BSD-3-Clause
+  fdeflate 0.3.7                      MIT OR Apache-2.0
+  flate2 1.1.2                        MIT OR Apache-2.0
+  flume 0.10.14                       Apache-2.0/MIT
+  foldhash 0.1.5                      Zlib
+  fontdue 0.9.3                       MIT OR Apache-2.0 OR Zlib
+  futures-core 0.3.21                 MIT OR Apache-2.0
+  futures-sink 0.3.32                 MIT OR Apache-2.0
+  fxhash 0.2.1                        Apache-2.0/MIT
+  getrandom 0.2.17                    MIT OR Apache-2.0
+  gif 0.13.3                          MIT OR Apache-2.0
+  gimli 0.31.1                        MIT OR Apache-2.0
+  glob 0.3.3                          MIT OR Apache-2.0
+  half 2.7.1                          MIT OR Apache-2.0
+  hashbrown 0.15.5                    MIT OR Apache-2.0
+  heck 0.5.0                          MIT OR Apache-2.0
+  hermit-abi 0.1.19                   MIT/Apache-2.0
+  image 0.24.9                        MIT OR Apache-2.0
+  indexmap 2.11.1                     Apache-2.0 OR MIT
+  io-uring 0.7.10                     MIT OR Apache-2.0
+  is_terminal_polyfill 1.70.1         MIT OR Apache-2.0
+  itoa 1.0.15                         MIT OR Apache-2.0
+  jiff 0.2.15                         Unlicense OR MIT
+  jiff-static 0.2.15                  Unlicense OR MIT
+  jpeg-decoder 0.3.2                  MIT OR Apache-2.0
+  js-sys 0.3.76                       MIT OR Apache-2.0
+  lazy_static 1.5.0                   MIT OR Apache-2.0
+  lebe 0.5.3                          BSD-3-Clause
+  libc 0.2.184                        MIT OR Apache-2.0
+  lock_api 0.4.14                     MIT OR Apache-2.0
+  log 0.4.28                          MIT OR Apache-2.0
+  memchr 2.7.5                        Unlicense OR MIT
+  memoffset 0.6.5                     MIT
+  miniz_oxide 0.6.2                   MIT OR Zlib OR Apache-2.0
+  miniz_oxide 0.8.9                   MIT OR Zlib OR Apache-2.0
+  mio 1.0.4                           MIT
+  nanorand 0.7.0                      Zlib
+  nohash-hasher 0.2.0                 Apache-2.0 OR MIT
+  num 0.4.0                           MIT OR Apache-2.0
+  num-bigint 0.4.3                    MIT OR Apache-2.0
+  num-complex 0.4.1                   MIT OR Apache-2.0
+  num-integer 0.1.45                  MIT OR Apache-2.0
+  num-iter 0.1.43                     MIT OR Apache-2.0
+  num-rational 0.4.0                  MIT OR Apache-2.0
+  num-traits 0.1.43                   MIT/Apache-2.0
+  num-traits 0.2.15                   MIT OR Apache-2.0
+  num_cpus 1.13.1                     MIT OR Apache-2.0
+  object 0.36.7                       Apache-2.0 OR MIT
+  once_cell 1.21.4                    MIT OR Apache-2.0
+  once_cell_polyfill 1.70.1           MIT OR Apache-2.0
+  peggler 0.1.0                       (none declared — see below)
+  pin-project 1.1.11                  Apache-2.0 OR MIT
+  pin-project-internal 1.1.11         Apache-2.0 OR MIT
+  pin-project-lite 0.2.16             Apache-2.0 OR MIT
+  png 0.17.16                         MIT OR Apache-2.0
+  portable-atomic 1.11.1              Apache-2.0 OR MIT
+  portable-atomic-util 0.2.4          Apache-2.0 OR MIT
+  proc-macro2 1.0.101                 MIT OR Apache-2.0
+  qoi 0.4.1                           MIT/Apache-2.0
+  quote 1.0.40                        MIT OR Apache-2.0
+  rayon 1.5.3                         MIT OR Apache-2.0
+  rayon-core 1.9.3                    MIT OR Apache-2.0
+  regex 1.11.2                        MIT OR Apache-2.0
+  regex-automata 0.4.10               MIT OR Apache-2.0
+  regex-syntax 0.8.6                  MIT OR Apache-2.0
+  rustc-demangle 0.1.26               MIT/Apache-2.0
+  ryu 1.0.10                          Apache-2.0 OR BSL-1.0
+  scopeguard 1.1.0                    MIT/Apache-2.0
+  serde 1.0.219                       MIT OR Apache-2.0
+  serde_derive 1.0.219                MIT OR Apache-2.0
+  serde_yaml 0.9.34+deprecated        MIT OR Apache-2.0
+  shakmaty 0.30.0                     GPL-3.0-or-later
+  simd-adler32 0.3.7                  MIT
+  slab 0.4.11                         MIT
+  smallvec 1.15.1                     MIT OR Apache-2.0
+  spin 0.9.8                          MIT
+  strsim 0.11.1                       MIT
+  syn 1.0.95                          MIT OR Apache-2.0
+  syn 2.0.106                         MIT OR Apache-2.0
+  thiserror 2.0.16                    MIT OR Apache-2.0
+  thiserror-impl 2.0.16               MIT OR Apache-2.0
+  threadpool 1.8.1                    MIT/Apache-2.0
+  tiff 0.9.1                          MIT
+  tokio 1.47.1                        MIT
+  tokio-stream 0.1.8                  MIT
+  ttf-parser 0.21.1                   MIT OR Apache-2.0
+  unicode-ident 1.0.0                 MIT OR Apache-2.0
+  unsafe-libyaml 0.2.11               MIT
+  utf8parse 0.2.2                     Apache-2.0 OR MIT
+  wasi 0.11.1+wasi-snapshot-preview1  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+  wasm-bindgen 0.2.99                 MIT OR Apache-2.0
+  wasm-bindgen-backend 0.2.99         MIT OR Apache-2.0
+  wasm-bindgen-macro 0.2.99           MIT OR Apache-2.0
+  wasm-bindgen-macro-support 0.2.99   MIT OR Apache-2.0
+  wasm-bindgen-shared 0.2.99          MIT OR Apache-2.0
+  weezl 0.1.10                        MIT OR Apache-2.0
+  windows-link 0.1.3                  MIT OR Apache-2.0
+  windows-sys 0.59.0                  MIT OR Apache-2.0
+  windows-sys 0.60.2                  MIT OR Apache-2.0
+  windows-targets 0.52.6              MIT OR Apache-2.0
+  windows-targets 0.53.3              MIT OR Apache-2.0
+  windows_aarch64_gnullvm 0.52.6      MIT OR Apache-2.0
+  windows_aarch64_gnullvm 0.53.0      MIT OR Apache-2.0
+  windows_aarch64_msvc 0.52.6         MIT OR Apache-2.0
+  windows_aarch64_msvc 0.53.0         MIT OR Apache-2.0
+  windows_i686_gnu 0.52.6             MIT OR Apache-2.0
+  windows_i686_gnu 0.53.0             MIT OR Apache-2.0
+  windows_i686_gnullvm 0.52.6         MIT OR Apache-2.0
+  windows_i686_gnullvm 0.53.0         MIT OR Apache-2.0
+  windows_i686_msvc 0.52.6            MIT OR Apache-2.0
+  windows_i686_msvc 0.53.0            MIT OR Apache-2.0
+  windows_x86_64_gnu 0.52.6           MIT OR Apache-2.0
+  windows_x86_64_gnu 0.53.0           MIT OR Apache-2.0
+  windows_x86_64_gnullvm 0.52.6       MIT OR Apache-2.0
+  windows_x86_64_gnullvm 0.53.0       MIT OR Apache-2.0
+  windows_x86_64_msvc 0.52.6          MIT OR Apache-2.0
+  windows_x86_64_msvc 0.53.0          MIT OR Apache-2.0
+  zerocopy 0.8.48                     BSD-2-Clause OR Apache-2.0 OR MIT
+  zerocopy-derive 0.8.48              BSD-2-Clause OR Apache-2.0 OR MIT
+  zune-inflate 0.2.54                 MIT OR Apache-2.0 OR Zlib
+
+peggler 0.1.0 (a build-time PEG parser-macro crate used by chess_pgn_parser,
+by the same author, Henri Wiechers) declares no licence on crates.io, and its
+repository (github.com/hwiechers/peggler) is no longer available.

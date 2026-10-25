@@ -1,0 +1,49 @@
+[package]
+name = "chessmarkable"
+version = "0.8.1"
+authors = ["Linus <linus@cosmos-ink.net>"]
+license = "GPL-3.0-or-later"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+# Default build targets the 11.8" reMarkable Paper Pro (ferrari): native
+# 1620x2160 QTFB buffer, no UI shrink.
+default = []
+# --features move builds for the 7.3" reMarkable Paper Pro Move (porsche):
+# 954x1696 QTFB buffer via MESSAGE_CUSTOM_INITIALIZE, menus scaled by 7.3/11.8.
+move = []
+
+[dependencies]
+serde_string_derive = { path = "serde_string_derive" }
+
+# Chess engine (pure Rust, aarch64 compatible - replaces pleco)
+shakmaty = "0.30"
+
+# Display: QTFB shared memory (via AppLoad)
+libc = "0.2"
+
+# Graphics types (previously re-exported from libremarkable)
+cgmath = "0.18"
+image = "0.24"
+
+# Text rendering (pure Rust TrueType rasterizer)
+fontdue = "0.9"
+
+# Existing deps (unchanged)
+anyhow = "1"
+clap = { version = "4.5", features = [ "derive" ] }
+downcast-rs = "2.0"
+env_logger = "0.11"
+fxhash = "0.2"
+lazy_static = "1.5"
+log = "0.4"
+serde = { version = "1", features = [ "derive" ] }
+serde_yaml = "0.9"
+thiserror = "2.0"
+glob = "0.3"
+chess_pgn_parser = { path = "chess_pgn_parser" }
+regex = "1.11"
+tokio = { version = "1.47", features = [ "rt-multi-thread", "sync" ] }
+tokio-stream = "0.1"
